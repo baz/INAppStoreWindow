@@ -809,7 +809,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
     CGFloat buttonOrigin = 0.0;
     if (!self.verticalTrafficLightButtons) {
         if (self.centerTrafficLightButtons) {
-            buttonOrigin = round(NSMidY(titleBarFrame) - INMidHeight(closeFrame));
+            buttonOrigin = round(NSMidY(titleBarFrame) - INMidHeight(closeFrame)) + self.centeredTrafficLightButtonsTopMargin;
         } else {
             buttonOrigin = NSMaxY(titleBarFrame) - NSHeight(closeFrame) - self.trafficLightButtonsTopMargin;
         }

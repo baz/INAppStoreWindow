@@ -90,6 +90,11 @@
 @property (nonatomic) CGFloat trafficLightButtonsTopMargin;
 
 /**
+ Adjusts the top padding of the traffic light buttons when centered
+ */
+@property (nonatomic) CGFloat centeredTrafficLightButtonsTopMargin;
+
+/**
  Adjusts the right padding of the fullscreen button
  */
 @property (nonatomic) CGFloat fullScreenButtonRightMargin;
