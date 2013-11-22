@@ -1,6 +1,6 @@
 ## INAppStoreWindow: Mac App Store style NSWindow subclass
 
-INAppStoreWindow is an NSWindow subclass that mimics the appearance of the main window in the Mac App Store application. These modifications consist of enlarging the title bar, and centering the traffic lights (**note that this subclass does not handle the creation of a toolbar**). The end result looks like this:
+INAppStoreWindow is an NSWindow subclass that mimics the appearance of the main window in the Mac App Store application. These modifications consist of enlarging the title bar, and centering the traffic lights **(note that this subclass does not handle the creation of a toolbar)**. The end result looks like this:
 
 ![INAppStoreWindow](http://i41.tinypic.com/abidd1.png)
 
@@ -88,13 +88,13 @@ Please refer to `INWindowButton.h` header documentation for more details.
 
 ### Customizing window's title appearance
 
-You can enable title drawing by setting `showsTitle` property to `YES`. You can adjust appearance using `titleTextColor`, `inactiveTitleTextColor`, `titleTextShadow`, and `inactiveTitleTextShadow` properties. Also, you can enable title drawing in fullscreen by setting `showsTitleInFullscreen` property to `YES`.
+You can enable title drawing by setting `showsTitle` property to `YES`. For NSDocument based apps, you can enable drawing the document proxy icon by setting `showsDocumentProxyIcon` property to `YES`. You can adjust appearance using `titleTextColor`, `inactiveTitleTextColor`, `titleTextShadow`, and `inactiveTitleTextShadow` properties. Also, you can enable title drawing in fullscreen by setting `showsTitleInFullscreen` property to `YES`.
 
 ### Using your own drawing code
 
 A lot of time and effort has gone into making the custom titlebar in INAppStoreWindow function just right, it would be a shame to have to re-implement all this work just to draw your own custom title bar. So INAppStoreWindow has a `titleBarDrawingBlock` property that can be set to a block containing your own drawing code!
 
-[![](http://dribbble.com/system/assets/2398/7253/screenshots/541256/notepad.png)](http://dribbble.com/shots/541256-Notepad-App-Mockup)
+[![](http://dribbble.s3.amazonaws.com/users/7253/screenshots/541256/notepad.png)](http://dribbble.com/shots/541256-Notepad-App-Mockup)
 
 ```obj-c
 [self.window setTitleBarDrawingBlock:^(BOOL drawsAsMainWindow, CGRect drawingRect, CGPathRef clippingPath){

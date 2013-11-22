@@ -17,6 +17,9 @@
 
 #import "INAppStoreWindow.h"
 
+#import <objc/runtime.h>
+
+
 #define IN_RUNNING_LION (floor(NSAppKitVersionNumber) > NSAppKitVersionNumber10_6)
 #define IN_COMPILING_LION __MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
 
@@ -165,6 +168,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
 - (void)_hideTitleBarView:(BOOL)hidden;
 - (CGFloat)_defaultTrafficLightLeftMargin;
 - (CGFloat)_defaultTrafficLightSeparation;
+- (NSRect)_contentViewFrame;
 @end
 
 @implementation INTitlebarView
@@ -288,7 +292,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
         [self getTitleFrame:&titleTextRect textAttributes:&titleTextStyles forWindow:window];
 		
         if (window.verticallyCenterTitle) {
-            titleTextRect.origin.y = floor(NSMidY(drawingRect) - (NSHeight(titleTextRect) / 2.f));
+            titleTextRect.origin.y = floor(NSMidY(drawingRect) - (NSHeight(titleTextRect) / 2.f) + 1);
         }
 		
         [window.title drawInRect:titleTextRect withAttributes:titleTextStyles];
@@ -362,7 +366,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
         NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
         BOOL shouldMiniaturize = [[userDefaults objectForKey:MDAppleMiniaturizeOnDoubleClickKey] boolValue];
         if (shouldMiniaturize) {
-            [[self window] miniaturize:self];
+            [[self window] performMiniaturize:self];
         }
     }
 }
@@ -379,7 +383,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
     NSPoint where =  [window convertBaseToScreen:[theEvent locationInWindow]];
     
     if ([window isMovableByWindowBackground] || ([window styleMask] & NSFullScreenWindowMask) == NSFullScreenWindowMask) {
-        [super mouseDragged: theEvent];
+        [super mouseDragged:theEvent];
         return;
     }
     NSPoint origin = [window frame].origin;
@@ -393,6 +397,25 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
         }
     }
 }
+@end
+
+@interface INAppStoreWindowContentView : NSView
+@end
+
+@implementation INAppStoreWindowContentView
+
+- (void)setFrame:(NSRect)frameRect
+{
+	frameRect = [(INAppStoreWindow *)self.window _contentViewFrame];
+	[super setFrame:frameRect];
+}
+
+- (void)setFrameSize:(NSSize)newSize
+{
+	newSize = [(INAppStoreWindow *)self.window _contentViewFrame].size;
+	[super setFrameSize:newSize];
+}
+
 @end
 
 @implementation INAppStoreWindow{
@@ -419,6 +442,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
 @synthesize inactiveTitleBarStartColor = _inactiveTitleBarStartColor;
 @synthesize inactiveTitleBarEndColor = _inactiveTitleBarEndColor;
 @synthesize inactiveBaselineSeparatorColor = _inactiveBaselineSeparatorColor;
+@synthesize showsDocumentProxyIcon = _showsDocumentProxyIcon;
 
 #pragma mark -
 #pragma mark Initialization
@@ -437,6 +461,14 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
         [self _doInitialWindowSetup];
     }
     return self;
+}
+
+- (void)setRepresentedURL:(NSURL *)url
+{
+    [super setRepresentedURL:url];
+    if (_showsDocumentProxyIcon == NO) {
+        [[self standardWindowButton:NSWindowDocumentIconButton] setImage:nil];
+    }
 }
 
 #pragma mark -
@@ -489,7 +521,19 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
 
 - (void)setContentView:(NSView *)aView
 {
+	// Remove performance-optimized content view class when changing content views
+    NSView *oldView = [self contentView];
+    if (oldView && object_getClass(oldView) == [INAppStoreWindowContentView class]) {
+		object_setClass(oldView, [NSView class]);
+    }
+    
     [super setContentView:aView];
+    
+	// Swap in performance-optimized content view class
+    if (aView && object_getClass(aView) == [NSView class]) {
+		object_setClass(aView, [INAppStoreWindowContentView class]);
+    }
+	
     [self _repositionContentView];
 }
 
@@ -602,6 +646,13 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
     }
 }
 
+- (void)setShowsDocumentProxyIcon:(BOOL)showsDocumentProxyIcon {
+    if (_showsDocumentProxyIcon != showsDocumentProxyIcon) {
+        _showsDocumentProxyIcon = showsDocumentProxyIcon;
+        [self _displayWindowAndTitlebar];
+    }
+}
+
 - (void)setCenterFullScreenButton:(BOOL)centerFullScreenButton{
     if( _centerFullScreenButton != centerFullScreenButton ) {
         _centerFullScreenButton = centerFullScreenButton;
@@ -664,6 +715,8 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             _closeButton.target = self;
             _closeButton.action = @selector(performClose:);
             [_closeButton setFrameOrigin:[[self standardWindowButton:NSWindowCloseButton] frame].origin];
+            [_closeButton.cell accessibilitySetOverrideValue:NSAccessibilityCloseButtonSubrole forAttribute:NSAccessibilitySubroleAttribute];
+            [_closeButton.cell accessibilitySetOverrideValue:NSAccessibilityRoleDescription(NSAccessibilityButtonRole, NSAccessibilityCloseButtonSubrole) forAttribute:NSAccessibilityRoleDescriptionAttribute];
             [[self themeFrameView] addSubview:_closeButton];
         }
     }
@@ -677,6 +730,8 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             _minimizeButton.target = self;
             _minimizeButton.action = @selector(performMiniaturize:);
             [_minimizeButton setFrameOrigin:[[self standardWindowButton:NSWindowMiniaturizeButton] frame].origin];
+            [_minimizeButton.cell accessibilitySetOverrideValue:NSAccessibilityMinimizeButtonSubrole forAttribute:NSAccessibilitySubroleAttribute];
+            [_minimizeButton.cell accessibilitySetOverrideValue:NSAccessibilityRoleDescription(NSAccessibilityButtonRole, NSAccessibilityMinimizeButtonSubrole) forAttribute:NSAccessibilityRoleDescriptionAttribute];
             [[self themeFrameView] addSubview:_minimizeButton];
         }
     }
@@ -690,6 +745,8 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             _zoomButton.target = self;
             _zoomButton.action = @selector(performZoom:);
             [_zoomButton setFrameOrigin:[[self standardWindowButton:NSWindowZoomButton] frame].origin];
+            [_zoomButton.cell accessibilitySetOverrideValue:NSAccessibilityZoomButtonSubrole forAttribute:NSAccessibilitySubroleAttribute];
+            [_zoomButton.cell accessibilitySetOverrideValue:NSAccessibilityRoleDescription(NSAccessibilityButtonRole, NSAccessibilityZoomButtonSubrole) forAttribute:NSAccessibilityRoleDescriptionAttribute];
             [[self themeFrameView] addSubview:_zoomButton];
         }
     }
@@ -703,6 +760,8 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             _fullScreenButton.target = self;
             _fullScreenButton.action = @selector(toggleFullScreen:);
             [_fullScreenButton setFrameOrigin:[[self standardWindowButton:NSWindowFullScreenButton] frame].origin];
+            [_fullScreenButton.cell accessibilitySetOverrideValue:NSAccessibilityFullScreenButtonSubrole forAttribute:NSAccessibilitySubroleAttribute];
+            [_fullScreenButton.cell accessibilitySetOverrideValue:NSAccessibilityRoleDescription(NSAccessibilityButtonRole, NSAccessibilityFullScreenButtonSubrole) forAttribute:NSAccessibilityRoleDescriptionAttribute];
             [[self themeFrameView] addSubview:_fullScreenButton];
         }
     }
@@ -756,9 +815,9 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
     [nc addObserver:self selector:@selector(_updateTitlebarView) name:NSApplicationDidResignActiveNotification object:nil];
     #if IN_COMPILING_LION
     if (IN_RUNNING_LION) {
-        [nc addObserver:self selector:@selector(windowDidExitFullScreen:) name:NSWindowDidExitFullScreenNotification object:nil];
-        [nc addObserver:self selector:@selector(windowWillEnterFullScreen:) name:NSWindowWillEnterFullScreenNotification object:nil];
-        [nc addObserver:self selector:@selector(windowWillExitFullScreen:) name:NSWindowWillExitFullScreenNotification object:nil];
+        [nc addObserver:self selector:@selector(windowDidExitFullScreen:) name:NSWindowDidExitFullScreenNotification object:self];
+        [nc addObserver:self selector:@selector(windowWillEnterFullScreen:) name:NSWindowWillEnterFullScreenNotification object:self];
+        [nc addObserver:self selector:@selector(windowWillExitFullScreen:) name:NSWindowWillExitFullScreenNotification object:self];
     }
     #endif
     [self _createTitlebarView];
@@ -842,7 +901,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
         NSRect docButtonIconFrame = [docIconButton frame];
 
         if (self.verticallyCenterTitle) {
-            docButtonIconFrame.origin.y = floorf(NSMidY(titleBarFrame) - INMidHeight(docButtonIconFrame));
+            docButtonIconFrame.origin.y = floor(NSMidY(titleBarFrame) - INMidHeight(docButtonIconFrame));
         } else {
             docButtonIconFrame.origin.y = NSMaxY(titleBarFrame) - NSHeight(docButtonIconFrame);
         }
@@ -861,7 +920,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             }
             fullScreenFrame.origin.x = NSWidth(titleBarFrame) - NSWidth(fullScreenFrame) - _fullScreenButtonRightMargin;
             if (self.centerFullScreenButton) {
-                fullScreenFrame.origin.y = floorf(NSMidY(titleBarFrame) - INMidHeight(fullScreenFrame));
+                fullScreenFrame.origin.y = floor(NSMidY(titleBarFrame) - INMidHeight(fullScreenFrame));
             } else {
                 fullScreenFrame.origin.y = NSMaxY(titleBarFrame) - NSHeight(fullScreenFrame) - self.fullScreenButtonTopMargin;
             }
@@ -873,7 +932,7 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             NSRect versionsButtonFrame = [versionsButton frame];
 
             if (self.verticallyCenterTitle) {
-                versionsButtonFrame.origin.y = floorf(NSMidY(titleBarFrame) - INMidHeight(versionsButtonFrame));
+                versionsButtonFrame.origin.y = floor(NSMidY(titleBarFrame) - INMidHeight(versionsButtonFrame));
             } else {
                 versionsButtonFrame.origin.y = NSMaxY(titleBarFrame) - NSHeight(versionsButtonFrame);
             }
@@ -983,18 +1042,23 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
     [_titleBarContainer setFrame:titleFrame];
 }
 
+- (NSRect)_contentViewFrame
+{
+    NSRect windowFrame = self.frame;
+    NSRect contentRect = [self contentRectForFrameRect:windowFrame];
+    
+    contentRect.size.height = NSHeight(windowFrame) - _titleBarHeight;
+    contentRect.origin = NSZeroPoint;
+    
+    return contentRect;
+}
+
 - (void)_repositionContentView
 {
     NSView *contentView = [self contentView];
-    NSRect windowFrame = [self frame];
-    NSRect currentContentFrame = [contentView frame];
-    NSRect newFrame = currentContentFrame;
-	
-    CGFloat titleHeight = NSHeight(windowFrame) - NSHeight(newFrame);
-    CGFloat extraHeight = _titleBarHeight - titleHeight;
-    newFrame.size.height -= extraHeight;
-	
-    if (!NSEqualRects(currentContentFrame, newFrame)) {
+    NSRect newFrame = [self _contentViewFrame];
+    
+    if (!NSEqualRects([contentView frame], newFrame)) {
         [contentView setFrame:newFrame];
         [contentView setNeedsDisplay:YES];
     }
