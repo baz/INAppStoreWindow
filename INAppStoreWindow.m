@@ -379,6 +379,9 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
 @implementation INTitlebarContainer
 - (void)mouseDragged:(NSEvent *)theEvent
 {
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
     NSWindow *window = [self window];
     NSPoint where =  [window convertBaseToScreen:[theEvent locationInWindow]];
     
@@ -396,6 +399,8 @@ NS_INLINE CGGradientRef INCreateGradientWithColors(NSColor *startingColor, NSCol
             where = now;
         }
     }
+	
+	#pragma clang diagnostic pop
 }
 @end
 
